@@ -1,4 +1,5 @@
-#include <glfw/deps/glad/glad.h>
+#include <glad/glad.h>
+#define GLFW_INCLUDE_NONE
 #include <glfw/glfw3.h>
 
 #include <stdio.h>
@@ -38,7 +39,7 @@ int main(int argc, char* argv[])
 
 	glfwMakeContextCurrent(window);
 
-	if (!gladLoadGL()) {
+	if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
 		printf("Failed to initialize glad\n");
 		goto gladLoadGLFail;
 	}
