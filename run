@@ -1,0 +1,6 @@
+#!/bin/bash
+
+
+mkdir proj
+cd proj
+cmake ../
