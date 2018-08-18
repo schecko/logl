@@ -28,48 +28,10 @@ bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) {
 	return true;
 }
 
-int main(int argc, char* argv[])
-{
+int oneTri(GLFWwindow* window) {
 	int result = 0;
 
-	glfwSetErrorCallback(
-		[](int error, const char* description) {
-		printf("GLFW error %i: %s\n", error, description);
-	}
-	);
-
-	if (!glfwInit()) {
-		printf("Failed to initialize GLFW\n");
-		result = -1;
-		goto glfwInitFail;
-	}
-
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-
-	GLFWwindow* window = glfwCreateWindow(WIDTH,
-											HEIGHT,
-											"LOGL",
-											nullptr,
-											nullptr);
-	if (!window) {
-		printf("Failed to create GLFW window\n");
-		result = -2;
-		goto glfwCreateWindowFail;
-	}
-
-	glfwMakeContextCurrent(window);
-
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-		printf("Failed to initialize glad\n");
-		result = -3;
-		goto gladLoadGLFail;
-	}
-
 	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
-
 
 	float vertices[] = {
 		-0.5f, -0.5f, 0.0f,
@@ -157,12 +119,58 @@ int main(int argc, char* argv[])
 		glfwPollEvents();
 	}
 
-	// exit
 done:
+	return result;
+}
+
+int main(int argc, char* argv[])
+{
+	int result = 0;
+
+	glfwSetErrorCallback(
+		[](int error, const char* description) {
+		printf("GLFW error %i: %s\n", error, description);
+	}
+	);
+
+	if (!glfwInit()) {
+		printf("Failed to initialize GLFW\n");
+		result = -1;
+		goto glfwInitFail;
+	}
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+	GLFWwindow* window = glfwCreateWindow(WIDTH,
+											HEIGHT,
+											"LOGL",
+											nullptr,
+											nullptr);
+	if (!window) {
+		printf("Failed to create GLFW window\n");
+		result = -2;
+		goto glfwCreateWindowFail;
+	}
+
+	glfwMakeContextCurrent(window);
+
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		printf("Failed to initialize glad\n");
+		result = -3;
+		goto gladLoadGLFail;
+	}
+
+	result = oneTri(window);
+
+	// exit
 gladLoadGLFail:
 	glfwDestroyWindow(window);
 glfwCreateWindowFail:
 	glfwTerminate();
 glfwInitFail:
+
 	return result;
 }
