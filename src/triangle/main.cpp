@@ -494,7 +494,21 @@ int main(int argc, char* argv[])
 		goto gladLoadGLFail;
 	}
 
-	result = twoFrag(window);
+
+	// turn on the different render outputs by changing the falses to 
+	// true. very primitive but quick to prototype.
+	if (false) {
+		result = oneTri(window);
+	}
+	else if (false) {
+		result = twoTri(window);
+	}
+	else if (false) {
+		result = twoVAO(window);
+	}
+	else {
+		result = twoFrag(window);
+	}
 
 	// exit
 gladLoadGLFail:
