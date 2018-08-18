@@ -15,7 +15,7 @@ add_subdirectory("${GLFW_DIR}")
 
 # glad
 set(GLAD_DIR "${LIB_DIR}/glad")
-add_library(glad "${GLAD_DIR}/src/glad.c")
+add_library(glad "${GLAD_DIR}/src/glad.c" "${GLAD_DIR}/include/glad/glad.h")
 target_include_directories(glad PRIVATE "${GLAD_DIR}/include")
 
 add_subdirectory(src/triangle)
