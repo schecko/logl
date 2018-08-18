@@ -1,6 +1,6 @@
 # Project definition
 cmake_minimum_required(VERSION 3.5)
-project(indexedTriangle)
+project(indexedQuad)
 
 # Source files
 set(SOURCES main.cpp)
