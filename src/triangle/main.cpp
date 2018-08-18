@@ -340,7 +340,7 @@ int twoFrag(GLFWwindow* window) {
 
 	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
 
-	float vertices[2][] = {
+	float vertices[] = {	
 		-1.0f, -0.5f, 0.0f,
 		0.0f, -0.5f, 0.0f,
 		-0.5f,  0.5f, 0.0f,
@@ -379,39 +379,54 @@ int twoFrag(GLFWwindow* window) {
 	}
 
 	// fragment shader
-	const char* fragmentShaderSource = R"(
+	const char fragmentShaderSourceRaw[] = R"(
 		#version 330 core
 		out vec4 color;
 
 		void main() {
-			color = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+			color = vec4(%f, %f, %f, 1.0f);
 		}
 	)";
 
-	int fragmentShader = 0;
-	if (!createShader(fragmentShaderSource, GL_FRAGMENT_SHADER, fragmentShader)) {
+	char fragmentShaderSource1[sizeof(fragmentShaderSourceRaw) * 2];
+	char fragmentShaderSource2[sizeof(fragmentShaderSourceRaw) * 2];
+	sprintf(fragmentShaderSource1, fragmentShaderSourceRaw, 0.2f, 0.3f, 0.5f);
+	sprintf(fragmentShaderSource2, fragmentShaderSourceRaw, 0.5f, 0.3f, 0.f);
+
+	int fragmentShader[2];
+	if (!createShader(fragmentShaderSource1, GL_FRAGMENT_SHADER, fragmentShader[0])) {
+		printf("Failed to create and compile fragment shader\n");
+		result = -5;
+		goto done;
+	}
+
+	if (!createShader(fragmentShaderSource2, GL_FRAGMENT_SHADER, fragmentShader[1])) {
 		printf("Failed to create and compile fragment shader\n");
 		result = -5;
 		goto done;
 	}
 
 	// pipeline
-	u32 pipeline = glCreateProgram();
-	glAttachShader(pipeline, vertexShader);
-	glAttachShader(pipeline, fragmentShader);
-	glLinkProgram(pipeline);
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
+	u32 pipeline[2];
+	for (int i = 0; i < 2; i++) {
+		pipeline[i] = glCreateProgram();
+		glAttachShader(pipeline[i], vertexShader);
+		glAttachShader(pipeline[i], fragmentShader[i]);
+		glLinkProgram(pipeline[i]);
+		glDeleteShader(fragmentShader[i]);
 
-	int success = 0;
-	char infoLog[512];
-	glGetProgramiv(pipeline, GL_LINK_STATUS, &success);
+		int success = 0;
+		char infoLog[512];
+		glGetProgramiv(pipeline[i], GL_LINK_STATUS, &success);
 
-	if (!success) {
-		glGetProgramInfoLog(pipeline, 512, nullptr, infoLog);
-		printf("failed to compile vertex shader: \n%s", infoLog);
-		return false;
+		if (!success) {
+			glGetProgramInfoLog(pipeline[i], 512, nullptr, infoLog);
+			printf("failed to compile vertex shader: \n%s", infoLog);
+			return false;
+		}
 	}
+	glDeleteShader(vertexShader);
+
 
 	// setup vertex attributes
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
@@ -420,11 +435,15 @@ int twoFrag(GLFWwindow* window) {
 	// main loop
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
-		glUseProgram(pipeline);
+
+
+
 		glBindVertexArray(vao);
 
-		//draw
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glUseProgram(pipeline[0]);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glUseProgram(pipeline[1]);
+		glDrawArrays(GL_TRIANGLES, 3, 3);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -464,7 +483,7 @@ int main(int argc, char* argv[])
 	if (!window) {
 		printf("Failed to create GLFW window\n");
 		result = -2;
-		goto glfwCreateWindowFail;A
+		goto glfwCreateWindowFail;
 	}
 
 	glfwMakeContextCurrent(window);
@@ -475,7 +494,7 @@ int main(int argc, char* argv[])
 		goto gladLoadGLFail;
 	}
 
-	result = twoVAO(window);
+	result = twoFrag(window);
 
 	// exit
 gladLoadGLFail:
