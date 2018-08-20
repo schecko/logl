@@ -19,3 +19,4 @@ add_library(glad "${GLAD_DIR}/src/glad.c" "${GLAD_DIR}/include/glad/glad.h")
 target_include_directories(glad PRIVATE "${GLAD_DIR}/include")
 
 add_subdirectory(src/triangle)
+add_subdirectory(src/shaders)
