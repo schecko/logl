@@ -2,6 +2,7 @@
 #include <glfw/glfw3.h>
 
 #include <stdio.h>
+#include <math.h>
 
 const int WIDTH = 800;
 const int HEIGHT = 400;
@@ -70,10 +71,12 @@ int helloShaders(GLFWwindow* window) {
 	// fragment shader
 	const char* fragmentShaderSource = R"(
 		#version 330 core
-		out vec4 color;
+		uniform vec4 uColor;
+
+		out vec4 oColor;
 
 		void main() {
-			color = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+			oColor = uColor;
 		}
 	)";
 
@@ -111,6 +114,11 @@ int helloShaders(GLFWwindow* window) {
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(pipeline);
 		glBindVertexArray(vao);
+
+		float time = glfwGetTime();
+		float color = sin(time) / 2.0f + 0.5f;
+		int uColorLocation = glGetUniformLocation(pipeline, "uColor");
+		glUniform4f(uColorLocation, 0.0f, color, 0.0f, 1.0f);
 
 		//draw
 		glDrawArrays(GL_TRIANGLES, 0, 3);
