@@ -21,12 +21,71 @@ bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) {
 
 	if (!success) {
 		glGetShaderInfoLog(outShader, 512, nullptr, infoLog);
-		glDeleteShader(outShader);
 		printf("failed to compile vertex shader: \n%s", infoLog);
+		glDeleteShader(outShader);
 		return false;
 	}
 
 	return true;
+}
+
+struct Pipeline {
+	u32 id;
+
+	void use() {
+		glUseProgram(this->id);
+	}
+
+	void setUniform(const char* name, int value) {
+		u32 location = glGetUniformLocation(this->id, name);
+		glUniform1i(location, value);
+	}
+
+	void setUniform(const char* name, bool value) {
+		this->setUniform(name, (int)value);
+	}
+
+	void setUniform(const char* name, float value) {
+		u32 location = glGetUniformLocation(this->id, name);
+		glUniform1f(this->id, value);
+	}
+};
+
+Pipeline initPipeline(const char* vertexSource, const char* fragmentSource) {
+	Pipeline pipeline = {};
+
+	u32 id;
+	int vertexShader = 0;
+	if (!createShader(vertexSource, GL_VERTEX_SHADER, vertexShader)) {
+		printf("Failed to create and compile vertex shader\n");
+		return pipeline;
+	}
+
+	int fragmentShader = 0;
+	if (!createShader(fragmentSource, GL_FRAGMENT_SHADER, fragmentShader)) {
+		printf("Failed to create and compile fragment shader\n");
+		return pipeline;
+	}
+
+	// pipeline
+	id = glCreateProgram();
+	glAttachShader(id, vertexShader);
+	glAttachShader(id, fragmentShader);
+	glLinkProgram(id);
+
+	int success = 0;
+	char infoLog[512];
+	glGetProgramiv(id, GL_LINK_STATUS, &success);
+
+	if (!success) {
+		glGetProgramInfoLog(id, 512, nullptr, infoLog);
+		printf("failed to compile vertex shader: \n%s", infoLog);
+		glDeleteProgram(id);
+		return pipeline;
+	}
+
+	pipeline.id = id;
+	return pipeline;
 }
 
 int helloShaders(GLFWwindow* window) {
@@ -35,9 +94,10 @@ int helloShaders(GLFWwindow* window) {
 	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
 
 	float vertices[] = {
-		-0.5f, -0.5f, 0.0f,
-		0.5f, -0.5f, 0.0f,
-		0.0f,  0.5f, 0.0f
+		// positions         // colors
+		0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
+		0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top 
 	};
 
 	//vertex array object
@@ -55,69 +115,47 @@ int helloShaders(GLFWwindow* window) {
 	const char* vertexShaderSource = R"(
 		#version 330 core
 		layout (location = 0) in vec3 pos;
+		layout (location = 1) in vec4 color;
+
+		out vec4 vColor;
 
 		void main() {
 			gl_Position = vec4(pos.xyz, 1.0);
+			vColor = color;
 		}	
 	)";
-
-	int vertexShader = 0;
-	if (!createShader(vertexShaderSource, GL_VERTEX_SHADER, vertexShader)) {
-		printf("Failed to create and compile vertex shader\n");
-		result = -4;
-		goto done;
-	}
 
 	// fragment shader
 	const char* fragmentShaderSource = R"(
 		#version 330 core
-		uniform vec4 uColor;
 
-		out vec4 oColor;
+		in vec4 vColor;
+		out vec4 fColor;
 
 		void main() {
-			oColor = uColor;
+			fColor = vColor;
 		}
 	)";
 
-	int fragmentShader = 0;
-	if (!createShader(fragmentShaderSource, GL_FRAGMENT_SHADER, fragmentShader)) {
-		printf("Failed to create and compile fragment shader\n");
-		result = -5;
-		goto done;
-	}
-
-	// pipeline
-	u32 pipeline = glCreateProgram();
-	glAttachShader(pipeline, vertexShader);
-	glAttachShader(pipeline, fragmentShader);
-	glLinkProgram(pipeline);
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-
-	int success = 0;
-	char infoLog[512];
-	glGetProgramiv(pipeline, GL_LINK_STATUS, &success);
-
-	if (!success) {
-		glGetProgramInfoLog(pipeline, 512, nullptr, infoLog);
-		printf("failed to compile vertex shader: \n%s", infoLog);
-		return false;
-	}
+	Pipeline pipeline = initPipeline(vertexShaderSource, fragmentShaderSource);
 
 	// setup vertex attributes
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
 	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
 
 	// main loop
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
-		glUseProgram(pipeline);
+		
+		pipeline.use();
 		glBindVertexArray(vao);
 
-		float time = glfwGetTime();
-		float color = sin(time) / 2.0f + 0.5f;
-		int uColorLocation = glGetUniformLocation(pipeline, "uColor");
+		float time = (float)glfwGetTime();
+		float color = (float)sin(time) / 2.0f + 0.5f;
+
+		int uColorLocation = glGetUniformLocation(pipeline.id, "uColor");
 		glUniform4f(uColorLocation, 0.0f, color, 0.0f, 1.0f);
 
 		//draw
