@@ -139,6 +139,10 @@ int helloShaders(GLFWwindow* window) {
 
 	Pipeline pipeline = initPipeline(vertexShaderSource, fragmentShaderSource);
 
+	if (!pipeline.id) {
+		goto done;
+	}
+
 	// setup vertex attributes
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
 	glEnableVertexAttribArray(0);
@@ -155,8 +159,256 @@ int helloShaders(GLFWwindow* window) {
 		float time = (float)glfwGetTime();
 		float color = (float)sin(time) / 2.0f + 0.5f;
 
-		int uColorLocation = glGetUniformLocation(pipeline.id, "uColor");
-		glUniform4f(uColorLocation, 0.0f, color, 0.0f, 1.0f);
+		//draw
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+done:
+	return result;
+}
+
+int upsideDownShader(GLFWwindow* window) {
+	int result = 0;
+
+	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
+
+	float vertices[] = {
+		// positions         // colors
+		0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
+		0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top 
+	};
+
+	//vertex array object
+	u32 vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	// vertex buffer
+	u32 vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	// vertex shader
+	const char* vertexShaderSource = R"(
+		#version 330 core
+		layout (location = 0) in vec3 pos;
+		layout (location = 1) in vec4 color;
+
+		out vec4 vColor;
+
+		void main() {
+			gl_Position = vec4(pos.x, -pos.y, pos.z, 1.0);
+			vColor = color;
+		}	
+	)";
+
+	// fragment shader
+	const char* fragmentShaderSource = R"(
+		#version 330 core
+
+		in vec4 vColor;
+		out vec4 fColor;
+
+		void main() {
+			fColor = vColor;
+		}
+	)";
+
+	Pipeline pipeline = initPipeline(vertexShaderSource, fragmentShaderSource);
+
+	if (!pipeline.id) {
+		goto done;
+	}
+
+	// setup vertex attributes
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	// main loop
+	while (!glfwWindowShouldClose(window)) {
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		pipeline.use();
+		glBindVertexArray(vao);
+
+		float time = (float)glfwGetTime();
+		float color = (float)sin(time) / 2.0f + 0.5f;
+
+		//draw
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+done:
+	return result;
+}
+
+int shadersWithOffset(GLFWwindow* window) {
+	int result = 0;
+
+	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
+
+	float vertices[] = {
+		// positions         // colors
+		0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
+		0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top 
+	};
+
+	//vertex array object
+	u32 vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	// vertex buffer
+	u32 vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	// vertex shader
+	const char* vertexShaderSource = R"(
+		#version 330 core
+		layout (location = 0) in vec3 pos;
+		layout (location = 1) in vec4 color;
+
+		uniform vec3 uOffset;
+
+		out vec4 vColor;
+
+		void main() {
+			gl_Position = vec4(pos.xyz + uOffset, 1.0);
+			vColor = color;
+		}	
+	)";
+
+	// fragment shader
+	const char* fragmentShaderSource = R"(
+		#version 330 core
+
+		in vec4 vColor;
+		out vec4 fColor;
+
+		void main() {
+			fColor = vColor;
+		}
+	)";
+
+	Pipeline pipeline = initPipeline(vertexShaderSource, fragmentShaderSource);
+
+	if (!pipeline.id) {
+		goto done;
+	}
+
+	// setup vertex attributes
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	// main loop
+	while (!glfwWindowShouldClose(window)) {
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		pipeline.use();
+		glBindVertexArray(vao);
+
+		float time = (float)glfwGetTime();
+		float color = (float)sin(time) / 2.0f + 0.5f;
+
+		int uOffsetLocation = glGetUniformLocation(pipeline.id, "uOffset");
+		glUniform3f(uOffsetLocation, -0.5f, 0.0f, 0.0f);
+
+		//draw
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+done:
+	return result;
+}
+
+int vertexColor(GLFWwindow* window) {
+	int result = 0;
+
+	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
+
+	float vertices[] = {
+		// positions         // colors
+		0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
+		0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top 
+	};
+
+	//vertex array object
+	u32 vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	// vertex buffer
+	u32 vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	// vertex shader
+	const char* vertexShaderSource = R"(
+		#version 330 core
+		layout (location = 0) in vec3 pos;
+		layout (location = 1) in vec4 color;
+
+		out vec4 vPosition;
+
+		void main() {
+			gl_Position = vec4(pos.xyz, 1.0);
+			vPosition = gl_Position;
+		}	
+	)";
+
+	// fragment shader
+	const char* fragmentShaderSource = R"(
+		#version 330 core
+
+		in vec4 vPosition;
+		out vec4 fColor;
+
+		void main() {
+			fColor = vPosition;
+		}
+	)";
+
+	Pipeline pipeline = initPipeline(vertexShaderSource, fragmentShaderSource);
+
+	if (!pipeline.id) {
+		goto done;
+	}
+
+	// setup vertex attributes
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	// main loop
+	while (!glfwWindowShouldClose(window)) {
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		pipeline.use();
+		glBindVertexArray(vao);
+
+		float time = (float)glfwGetTime();
+		float color = (float)sin(time) / 2.0f + 0.5f;
 
 		//draw
 		glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -212,11 +464,17 @@ int main(int argc, char* argv[])
 
 	// turn on the different render outputs by changing the falses to 
 	// true. very primitive but quick to prototype.
-	if (true) {
+	if (false) {
 		result = helloShaders(window);
 	}
+	else if (false) {
+		result = shadersWithOffset(window);
+	}
+	else if (true) {
+		result = vertexColor(window);
+	}
 	else {
-		result = 0;
+		result = upsideDownShader(window);
 	}
 
 	// exit
