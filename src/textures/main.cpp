@@ -4,10 +4,15 @@
 #include <stdio.h>
 #include <math.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 const int WIDTH = 800;
 const int HEIGHT = 400;
 
 typedef unsigned int u32;
+
+#define ASSERT(test) if (!(test)) { *(int*)0 = 0; }
 
 bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) {
 
@@ -32,6 +37,41 @@ bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) {
 struct Pipeline {
 	u32 id;
 
+	Pipeline(const char* vertexSource, const char* fragmentSource) {
+
+		u32 id;
+		int vertexShader = 0;
+		if (!createShader(vertexSource, GL_VERTEX_SHADER, vertexShader)) {
+			printf("Failed to create and compile vertex shader\n");
+			return;
+		}
+
+		int fragmentShader = 0;
+		if (!createShader(fragmentSource, GL_FRAGMENT_SHADER, fragmentShader)) {
+			printf("Failed to create and compile fragment shader\n");
+			return;
+		}
+
+		// pipeline
+		id = glCreateProgram();
+		glAttachShader(id, vertexShader);
+		glAttachShader(id, fragmentShader);
+		glLinkProgram(id);
+
+		int success = 0;
+		char infoLog[512];
+		glGetProgramiv(id, GL_LINK_STATUS, &success);
+
+		if (!success) {
+			glGetProgramInfoLog(id, 512, nullptr, infoLog);
+			printf("failed to compile vertex shader: \n%s", infoLog);
+			glDeleteProgram(id);
+			return;
+		}
+
+		this->id = id;
+	}
+
 	void use() {
 		glUseProgram(this->id);
 	}
@@ -51,53 +91,23 @@ struct Pipeline {
 	}
 };
 
-Pipeline initPipeline(const char* vertexSource, const char* fragmentSource) {
-	Pipeline pipeline = {};
 
-	u32 id;
-	int vertexShader = 0;
-	if (!createShader(vertexSource, GL_VERTEX_SHADER, vertexShader)) {
-		printf("Failed to create and compile vertex shader\n");
-		return pipeline;
-	}
-
-	int fragmentShader = 0;
-	if (!createShader(fragmentSource, GL_FRAGMENT_SHADER, fragmentShader)) {
-		printf("Failed to create and compile fragment shader\n");
-		return pipeline;
-	}
-
-	// pipeline
-	id = glCreateProgram();
-	glAttachShader(id, vertexShader);
-	glAttachShader(id, fragmentShader);
-	glLinkProgram(id);
-
-	int success = 0;
-	char infoLog[512];
-	glGetProgramiv(id, GL_LINK_STATUS, &success);
-
-	if (!success) {
-		glGetProgramInfoLog(id, 512, nullptr, infoLog);
-		printf("failed to compile vertex shader: \n%s", infoLog);
-		glDeleteProgram(id);
-		return pipeline;
-	}
-
-	pipeline.id = id;
-	return pipeline;
-}
 
 int helloTextures(GLFWwindow* window) {
-	int result = 0;
 
 	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
 
 	float vertices[] = {
-		// positions         // colors
-		0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,   // bottom right
-		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,   // bottom left
-		0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f    // top 
+		// positions			// colors           // texture coords
+		0.5f,  0.5f, 0.0f,		1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
+		0.5f, -0.5f, 0.0f,		0.0f, 1.0f, 0.0f,   1.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,		0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left
+		-0.5f,  0.5f, 0.0f,		1.0f, 1.0f, 0.0f,   0.0f, 1.0f    // top left 
+	};
+
+	u32 indices[] = {
+		0, 1, 3,
+		1, 2, 3
 	};
 
 	//vertex array object
@@ -111,17 +121,27 @@ int helloTextures(GLFWwindow* window) {
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+	u32 ebo;
+	glGenBuffers(1, &ebo);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
 	// vertex shader
 	const char* vertexShaderSource = R"(
 		#version 330 core
 		layout (location = 0) in vec3 pos;
 		layout (location = 1) in vec4 color;
+		layout (location = 2) in vec2 texCoords;
 
 		out vec4 vColor;
+		out vec2 vCoord;
 
-		void main() {
+		void main() 
+		{
 			gl_Position = vec4(pos.xyz, 1.0);
 			vColor = color;
+			vCoord = texCoords;
 		}	
 	)";
 
@@ -130,24 +150,50 @@ int helloTextures(GLFWwindow* window) {
 		#version 330 core
 
 		in vec4 vColor;
+		in vec2 vCoord;
+		uniform sampler2D uTexture;
 		out vec4 fColor;
 
-		void main() {
-			fColor = vColor;
+		void main() 
+		{
+			fColor = texture(uTexture, vCoord);
 		}
 	)";
 
-	Pipeline pipeline = initPipeline(vertexShaderSource, fragmentShaderSource);
+	Pipeline pipeline = Pipeline(vertexShaderSource, fragmentShaderSource);
 
 	if (!pipeline.id) {
-		goto done;
+		return -5;
 	}
 
 	// setup vertex attributes
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+	// setup texture state
+	u32 texture;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	int width, height, channels;
+	char imageName[] = "/gears.jpeg";
+	char imagePath[sizeof(DATA_DIR) + sizeof(imageName)];
+	sprintf_s(imagePath, "%s%s", DATA_DIR, imageName);
+	unsigned char* data = stbi_load(imagePath, &width, &height, &channels, 0);
+
+	ASSERT(data);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	stbi_image_free(data);
 
 	// main loop
 	while (!glfwWindowShouldClose(window)) {
@@ -155,19 +201,19 @@ int helloTextures(GLFWwindow* window) {
 		
 		pipeline.use();
 		glBindVertexArray(vao);
+		glBindTexture(GL_TEXTURE_2D, texture);
 
 		float time = (float)glfwGetTime();
 		float color = (float)sin(time) / 2.0f + 0.5f;
 
 		//draw
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
-done:
-	return result;
+	return 0;
 }
 
 int main(int argc, char* argv[])
