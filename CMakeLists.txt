@@ -20,3 +20,4 @@ target_include_directories(glad PRIVATE "${GLAD_DIR}/include")
 
 add_subdirectory(src/triangle)
 add_subdirectory(src/shaders)
+add_subdirectory(src/textures)
