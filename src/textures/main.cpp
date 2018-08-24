@@ -101,6 +101,8 @@ struct Texture {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
 		int width, height, channels;
 		char imagePath[255];
@@ -358,7 +360,131 @@ int blendedTextures(GLFWwindow* window) {
 		float time = (float)glfwGetTime();
 		float color = (float)sin(time) / 2.0f + 0.5f;
 
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		//draw
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+	return 0;
+}
+
+int textureWrapping(GLFWwindow* window) {
+
+	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
+
+	float vertices[] = {
+		// positions			// colors           // texture coords
+		0.5f,  0.5f, 0.0f,		1.0f, 0.0f, 0.0f,   2.0f, 2.0f,   // top right
+		0.5f, -0.5f, 0.0f,		0.0f, 1.0f, 0.0f,   2.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,		0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left
+		-0.5f,  0.5f, 0.0f,		1.0f, 1.0f, 0.0f,   0.0f, 2.0f    // top left 
+	};
+
+	u32 indices[] = {
+		0, 1, 3,
+		1, 2, 3
+	};
+
+	//vertex array object
+	u32 vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	// vertex buffer
+	u32 vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	u32 ebo;
+	glGenBuffers(1, &ebo);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// vertex shader
+	const char* vertexShaderSource = R"(
+		#version 330 core
+		layout (location = 0) in vec3 pos;
+		layout (location = 1) in vec4 color;
+		layout (location = 2) in vec2 texCoords;
+
+		out vec4 vColor;
+		out vec2 vCoord;
+
+		void main() 
+		{
+			gl_Position = vec4(pos.xyz, 1.0);
+			vColor = color;
+			vCoord = texCoords;
+		}	
+	)";
+
+	// fragment shader
+	const char* fragmentShaderSource = R"(
+		#version 330 core
+
+		in vec4 vColor;
+		in vec2 vCoord;
+		uniform sampler2D uTexture1;
+		uniform sampler2D uTexture2;
+		out vec4 fColor;
+
+		void main() 
+		{
+			vec4 c1 = texture(uTexture1, vCoord);
+			vec4 c2 = texture(uTexture2, vCoord);
+			
+			vec3 color = c2.rgb;
+			if(c1.a > 0.1) {
+				color = mix(c1, c2, .5).rgb;
+			}
+
+			fColor = vec4(color, 1.0);
+		}
+	)";
+
+	Pipeline pipeline = Pipeline(vertexShaderSource, fragmentShaderSource);
+
+	if (!pipeline.id) {
+		return -5;
+	}
+
+	// setup vertex attributes
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+
+
+
+	Texture tex0 = Texture("/face.png", GL_RGBA);
+	Texture tex1 = Texture("/wall.jpg", GL_RGBA);
+	// overwrite the default settings for tex1
+	glBindTexture(GL_TEXTURE_2D, tex1.id);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	// main loop
+	while (!glfwWindowShouldClose(window)) {
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		pipeline.use();
+		pipeline.setUniform("uTexture1", 0);
+		pipeline.setUniform("uTexture2", 1);
+
+		glBindVertexArray(vao);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, tex0.id);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, tex1.id);
+
+		float time = (float)glfwGetTime();
+		float color = (float)sin(time) / 2.0f + 0.5f;
 
 		//draw
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -417,8 +543,11 @@ int main(int argc, char* argv[])
 	if (false) {
 		result = singleTexture(window);
 	}
-	else if (true) {
+	else if (false) {
 		result = blendedTextures(window);
+	}
+	else if (true) {
+		result = textureWrapping(window);
 	}
 	else {
 		result = 0;
