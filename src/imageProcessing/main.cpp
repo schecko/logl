@@ -95,6 +95,7 @@ struct Pipeline {
 
 struct Texture {
 	u32 id;
+	int width, height;
 
 	Texture(const char* file, u32 format) {
 		glGenTextures(1, &this->id);
@@ -106,7 +107,7 @@ struct Texture {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
-		int width, height, channels;
+		int channels;
 		char imagePath[255];
 		sprintf_s(imagePath, "%s%s", DATA_DIR, file);
 
@@ -115,7 +116,7 @@ struct Texture {
 			desiredChannel = 4;
 		}
 
-		unsigned char* data = stbi_load(imagePath, &width, &height, &channels, desiredChannel);
+		unsigned char* data = stbi_load(imagePath, &this->width, &this->height, &channels, desiredChannel);
 
 		ASSERT(data);
 
@@ -129,20 +130,20 @@ int singleTexture(GLFWwindow* window) {
 
 	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
 
-	float offset = 0.5;
+	float offset = 0.5f;
 	float vertices[] = {
 		// left texture
 		// positions					// texture coords
-		0.5f - offset,  0.5f, 0.0f,		1.0f, 1.0f,   // top right
-		0.5f - offset, -0.5f, 0.0f,		1.0f, 0.0f,   // bottom right
-		-0.5f - offset, -0.5f, 0.0f,	0.0f, 0.0f,   // bottom left
-		-0.5f - offset,  0.5f, 0.0f,	0.0f, 1.0f,    // top left 
+		0.5f - offset,  1.0f, 0.0f,		1.0f, 1.0f,   // top right
+		0.5f - offset, -1.0f, 0.0f,		1.0f, 0.0f,   // bottom right
+		-0.5f - offset, -1.0f, 0.0f,	0.0f, 0.0f,   // bottom left
+		-0.5f - offset,  1.0f, 0.0f,	0.0f, 1.0f,    // top left 
 
 		// right texture
-		0.5f + offset,  0.5f, 0.0f,		1.0f, 1.0f,   // top right
-		0.5f + offset, -0.5f, 0.0f,		1.0f, 0.0f,   // bottom right
-		-0.5f + offset, -0.5f, 0.0f,	0.0f, 0.0f,   // bottom left
-		-0.5f + offset,  0.5f, 0.0f,	0.0f, 1.0f    // top left 
+		0.5f + offset,  1.0f, 0.0f,		1.0f, 1.0f,   // top right
+		0.5f + offset, -1.0f, 0.0f,		1.0f, 0.0f,   // bottom right
+		-0.5f + offset, -1.0f, 0.0f,	0.0f, 0.0f,   // bottom left
+		-0.5f + offset,  1.0f, 0.0f,	0.0f, 1.0f    // top left 
 	};
 
 	u32 indices[] = {
@@ -191,17 +192,41 @@ int singleTexture(GLFWwindow* window) {
 
 		in vec2 vCoord;
 		uniform sampler2D uTexture;
+		uniform int uWidth;
+		uniform int uHeight;
 		out vec4 fColor;
 
 		void main() 
 		{
-			fColor = texture(uTexture, vCoord);
+			fColor = texelFetch(uTexture, ivec2(vCoord.x * uWidth, vCoord.y * uHeight), 0);
+			//fColor = texture(uTexture, vCoord);
+		}
+	)";
+
+	// fragment shader
+	const char* imageProcessingFragmentSource = R"(
+		#version 330 core
+
+		in vec2 vCoord;
+		uniform sampler2D uTexture;
+		uniform int uWidth;
+		uniform int uHeight;
+		out vec4 fColor;
+
+		void main() 
+		{
+			fColor = texelFetch(uTexture, ivec2(vCoord.x * uWidth, vCoord.y * uHeight), 0) - 0.2;
 		}
 	)";
 
 	Pipeline normalPipeline = Pipeline(vertexShaderSource, normalFragmentShaderSource);
+	Pipeline processingPipeline = Pipeline(vertexShaderSource, imageProcessingFragmentSource);
 
 	if (!normalPipeline.id) {
+		return -5;
+	}
+
+	if (!processingPipeline.id) {
 		return -5;
 	}
 
@@ -211,41 +236,26 @@ int singleTexture(GLFWwindow* window) {
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 
-	// setup texture state
-	u32 texture;
-	glGenTextures(1, &texture);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	int width, height, channels;
-	char imageName[] = "/wall.jpg";
-	char imagePath[sizeof(DATA_DIR) + sizeof(imageName)];
-	sprintf_s(imagePath, "%s%s", DATA_DIR, imageName);
-	unsigned char* data = stbi_load(imagePath, &width, &height, &channels, 0);
-
-	ASSERT(data);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	stbi_image_free(data);
+	Texture texture = Texture("/face.png", GL_RGBA);
 
 	// main loop
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		normalPipeline.use();
+
+		normalPipeline.setUniform("uWidth", texture.width);
+		normalPipeline.setUniform("uHeight", texture.height);
 		glBindVertexArray(vao);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture);
+		glBindTexture(GL_TEXTURE_2D, texture.id);
 
 		//draw
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-		normalPipeline.use();
+		processingPipeline.use();
+		processingPipeline.setUniform("uWidth", texture.width);
+		processingPipeline.setUniform("uHeight", texture.height);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(6 * sizeof(int)));
 
 		glfwSwapBuffers(window);
