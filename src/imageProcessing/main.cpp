@@ -12,6 +12,7 @@ const int HEIGHT = 400;
 
 typedef unsigned int u32;
 
+#define PI 3.14159265359f
 #define ASSERT(test) if (!(test)) { *(int*)0 = 0; }
 
 bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) 
@@ -102,6 +103,7 @@ struct Pipeline {
 struct Image 
 {
 	int width, height, channels;
+	bool rgb;
 	float* data;
 };
 
@@ -109,6 +111,7 @@ Image loadImage(const char* file, int desiredChannels)
 {
 	Image image = {};
 	image.channels = desiredChannels;
+	image.rgb = true;
 
 	char imagePath[255];
 	sprintf_s(imagePath, "%s%s", DATA_DIR, file);
@@ -118,6 +121,133 @@ Image loadImage(const char* file, int desiredChannels)
 	ASSERT(image.data);
 
 	return image;
+}
+
+Image toHSI(Image sourceImage)
+{
+	ASSERT(sourceImage.rgb);
+	Image destImage = sourceImage;
+	destImage.data = (float*)malloc(sizeof(float) * destImage.height * destImage.width * sourceImage.channels);
+	destImage.rgb = false;
+
+	for (int y = 0; y < sourceImage.height; y++) {
+		for (int x = 0; x < sourceImage.width; x++) {
+			float* dest = &destImage.data[x + y * sourceImage.channels];
+			float* source = &sourceImage.data[x + y * sourceImage.channels];
+
+			if (sourceImage.channels == 4) {
+				// flat copy of the alpha
+				dest[3] = source[3];
+			}
+
+			float min = source[0];
+			// ignore alpha, dont compare r with r.
+			for (int i = 1; i < 3; i++) {
+				if (min > source[i]) {
+					min = source[i];
+				}
+			}
+			float r = source[0];
+			float g = source[1];
+			float b = source[2];
+
+			float rgbSum = (r + g + b);
+			float intensity = rgbSum / 3.0f;
+
+			float saturation = 1.0f - (3.0f / rgbSum) * min;
+			double angle = (r - 0.5f * g - 0.5f * b) / sqrt((r - g) * (r - g) + (r - b) * (g - b));
+			float hue = (float)acos(angle);
+			
+			if (hue > 2.0f * PI) {
+				hue = 2.0f * PI - hue;
+			}
+			
+			dest[0] = hue;
+			dest[1] = saturation;
+			dest[2] = intensity;
+		}
+	}
+
+	return destImage;
+}
+
+Image toRGB(Image sourceImage) {
+	ASSERT(!sourceImage.rgb);
+	Image destImage = sourceImage;
+	destImage.data = (float*)malloc(sizeof(float) * destImage.height * destImage.width * sourceImage.channels);
+	destImage.rgb = true;
+
+	for (int y = 0; y < sourceImage.height; y++) {
+		for (int x = 0; x < sourceImage.width; x++) {
+			float* dest = &destImage.data[x * y * sourceImage.channels];
+			float* source = &sourceImage.data[x * y * sourceImage.channels];
+
+			if (sourceImage.channels == 4) {
+				// flat copy of the alpha
+				dest[3] = source[3];
+			}
+
+			float hue = source[0];
+			float saturation = source[1];
+			float intensity = source[2];
+
+			float r, g, b;
+
+			float epsilon = 0.05f;
+			if (intensity <= epsilon) {
+				//black
+				r = 0.0f;
+				g = 0.0f;
+				b = 0.0f;
+			}
+			else if (saturation <= epsilon) {
+				// grey scale
+				r = intensity;
+				g = intensity;
+				b = intensity;
+			}
+			else {
+				if (hue < 0.0f) {
+					hue += 2.0f * PI;
+				}
+
+				float scale = 3.0f * intensity;
+							// 120deg
+				if (hue <= PI * 2.0f / 3.0f) {
+					float angle1 = hue;
+									// 60deg
+					float angle2 = (PI / 3.0f - hue);
+					b = (1.0f - saturation) / 3.0f * scale;
+					r = (1.0f + (saturation * cos(angle1) / cos(angle2))) / 3.0f * scale;
+					g = (1.0f - r - b) * scale;
+				}				// 120deg					// 240deg
+				else if (hue > PI * 2.0f / 3.0f && hue <= PI * 4.0f / 3.0f) {
+					hue -= PI * 2.0f / 3.0f;
+					float angle1 = hue;
+					float angle2 = (PI / 3.0f - hue);
+
+					r = (1.0f - saturation) / 3.0f * scale;
+					g = (1.0f + (saturation * cos(angle1) / cos(angle2))) / 3.0f * scale;
+					b = (1.0f - r - g) * scale;
+				}
+				else {
+					hue -= PI * 4.0f / 3.0f;
+					float angle1 = hue;
+					float angle2 = (PI / 3.0f - hue);
+
+					g = (1.0f - saturation) / 3.0f * scale;
+					b = (1.0f + (saturation * cos(angle1) / cos(angle2))) / 3.0f * scale;
+					r = (1.0f - g - b) * scale;
+				}
+			}
+			
+			dest[0] = r;
+			dest[1] = g;
+			dest[2] = b;
+		}
+	}
+
+	return destImage;
 }
 
 struct Texture 
@@ -268,8 +398,14 @@ int singleTexture(GLFWwindow* window)
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 
-	Texture texture = Texture("/face.png", 4);
+	Image image = loadImage("/color-face.jpg", 4);
+	Image hsiImage = toHSI(image);
+	Image rgbImage = toRGB(hsiImage); // should be same as original
 
+	Texture texture = Texture(image);
+	Texture hsiTexture = Texture(hsiImage);
+	Texture rgbTexture = Texture(rgbImage);
+	
 	// main loop
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -285,15 +421,17 @@ int singleTexture(GLFWwindow* window)
 		//draw
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-		processingPipeline.use();
-		processingPipeline.setUniform("uWidth", texture.width);
-		processingPipeline.setUniform("uHeight", texture.height);
+		//processingPipeline.use();
+		//processingPipeline.setUniform("uWidth", texture.width);
+		//processingPipeline.setUniform("uHeight", texture.height);
+		glBindTexture(GL_TEXTURE_2D, rgbTexture.id);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(6 * sizeof(int)));
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
+	stbi_image_free(image.data);
 	return 0;
 }
 
