@@ -116,11 +116,10 @@ struct Texture {
 			desiredChannel = 4;
 		}
 
-		unsigned char* data = stbi_load(imagePath, &this->width, &this->height, &channels, desiredChannel);
-
+		float* data = stbi_loadf(imagePath, &this->width, &this->height, &channels, desiredChannel);
 		ASSERT(data);
 
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format, GL_FLOAT, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 		stbi_image_free(data);
 	}
@@ -199,7 +198,6 @@ int singleTexture(GLFWwindow* window) {
 		void main() 
 		{
 			fColor = texelFetch(uTexture, ivec2(vCoord.x * uWidth, vCoord.y * uHeight), 0);
-			//fColor = texture(uTexture, vCoord);
 		}
 	)";
 
