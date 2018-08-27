@@ -132,8 +132,8 @@ Image toHSI(Image sourceImage)
 
 	for (int y = 0; y < sourceImage.height; y++) {
 		for (int x = 0; x < sourceImage.width; x++) {
-			float* dest = &destImage.data[x + y * sourceImage.channels];
-			float* source = &sourceImage.data[x + y * sourceImage.channels];
+			float* dest = &destImage.data[x * destImage.height * sourceImage.channels + y * sourceImage.channels];
+			float* source = &sourceImage.data[x * destImage.height * sourceImage.channels + y * sourceImage.channels];
 
 			if (sourceImage.channels == 4) {
 				// flat copy of the alpha
@@ -179,8 +179,8 @@ Image toRGB(Image sourceImage) {
 
 	for (int y = 0; y < sourceImage.height; y++) {
 		for (int x = 0; x < sourceImage.width; x++) {
-			float* dest = &destImage.data[x * y * sourceImage.channels];
-			float* source = &sourceImage.data[x * y * sourceImage.channels];
+			float* dest = &destImage.data[x * destImage.height * sourceImage.channels + y * sourceImage.channels];
+			float* source = &sourceImage.data[x * destImage.height * sourceImage.channels + y * sourceImage.channels];
 
 			if (sourceImage.channels == 4) {
 				// flat copy of the alpha
