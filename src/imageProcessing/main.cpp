@@ -14,7 +14,8 @@ typedef unsigned int u32;
 
 #define ASSERT(test) if (!(test)) { *(int*)0 = 0; }
 
-bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) {
+bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) 
+{
 
 	outShader = glCreateShader(shaderType);
 	glShaderSource(outShader, 1, &shaderSource, nullptr);
@@ -37,7 +38,8 @@ bool createShader(const char* shaderSource, GLuint shaderType, int& outShader) {
 struct Pipeline {
 	u32 id;
 
-	Pipeline(const char* vertexSource, const char* fragmentSource) {
+	Pipeline(const char* vertexSource, const char* fragmentSource) 
+	{
 
 		u32 id;
 		int vertexShader = 0;
@@ -72,20 +74,24 @@ struct Pipeline {
 		this->id = id;
 	}
 
-	void use() {
+	void use() 
+	{
 		glUseProgram(this->id);
 	}
 
-	void setUniform(const char* name, int value) {
+	void setUniform(const char* name, int value) 
+	{
 		u32 location = glGetUniformLocation(this->id, name);
 		glUniform1i(location, value);
 	}
 
-	void setUniform(const char* name, bool value) {
+	void setUniform(const char* name, bool value) 
+	{
 		this->setUniform(name, (int)value);
 	}
 
-	void setUniform(const char* name, float value) {
+	void setUniform(const char* name, float value) 
+	{
 		u32 location = glGetUniformLocation(this->id, name);
 		u32 error = glGetError();
 		glUniform1f(location, value);
@@ -93,11 +99,37 @@ struct Pipeline {
 	}
 };
 
-struct Texture {
+struct Image 
+{
+	int width, height, channels;
+	float* data;
+};
+
+Image loadImage(const char* file, int desiredChannels) 
+{
+	Image image = {};
+	image.channels = desiredChannels;
+
+	char imagePath[255];
+	sprintf_s(imagePath, "%s%s", DATA_DIR, file);
+
+	int unused;
+	image.data = stbi_loadf(imagePath, &image.width, &image.height, &unused, desiredChannels);
+	ASSERT(image.data);
+
+	return image;
+}
+
+struct Texture 
+{
 	u32 id;
 	int width, height;
 
-	Texture(const char* file, u32 format) {
+	Texture(Image image) 
+	{
+		this->height = image.height;
+		this->width = image.width;
+
 		glGenTextures(1, &this->id);
 		glBindTexture(GL_TEXTURE_2D, this->id);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -107,25 +139,27 @@ struct Texture {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
-		int channels;
-		char imagePath[255];
-		sprintf_s(imagePath, "%s%s", DATA_DIR, file);
-
-		u32 desiredChannel = 3;
-		if (format == GL_RGBA) {
-			desiredChannel = 4;
+		u32 format = GL_RGBA;
+		if (image.channels == 3) {
+			format = GL_RGB;
 		}
 
-		float* data = stbi_loadf(imagePath, &this->width, &this->height, &channels, desiredChannel);
-		ASSERT(data);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format, GL_FLOAT, data);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, this->width, this->height, 0, format, GL_FLOAT, image.data);
 		glGenerateMipmap(GL_TEXTURE_2D);
-		stbi_image_free(data);
 	}
+
+	Texture(const char* file, u32 channels) 
+	{
+		Image image = loadImage(file, channels);
+		*this = Texture(image);
+		stbi_image_free(image.data);
+	}
+
+
 };
 
-int singleTexture(GLFWwindow* window) {
+int singleTexture(GLFWwindow* window) 
+{
 
 	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
 
@@ -213,7 +247,7 @@ int singleTexture(GLFWwindow* window) {
 
 		void main() 
 		{
-			fColor = texelFetch(uTexture, ivec2(vCoord.x * uWidth, vCoord.y * uHeight), 0) - 0.2;
+			fColor = 1.0 - texelFetch(uTexture, ivec2(vCoord.x * uWidth, vCoord.y * uHeight), 0);
 		}
 	)";
 
@@ -234,7 +268,7 @@ int singleTexture(GLFWwindow* window) {
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 
-	Texture texture = Texture("/face.png", GL_RGBA);
+	Texture texture = Texture("/face.png", 4);
 
 	// main loop
 	while (!glfwWindowShouldClose(window)) {
