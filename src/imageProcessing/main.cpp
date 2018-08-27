@@ -129,17 +129,28 @@ int singleTexture(GLFWwindow* window) {
 
 	glClearColor(0.7f, 0.3f, 0.7f, 1.0f);
 
+	float offset = 0.5;
 	float vertices[] = {
-		// positions			// colors           // texture coords
-		0.5f,  0.5f, 0.0f,		1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
-		0.5f, -0.5f, 0.0f,		0.0f, 1.0f, 0.0f,   1.0f, 0.0f,   // bottom right
-		-0.5f, -0.5f, 0.0f,		0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left
-		-0.5f,  0.5f, 0.0f,		1.0f, 1.0f, 0.0f,   0.0f, 1.0f    // top left 
+		// left texture
+		// positions					// texture coords
+		0.5f - offset,  0.5f, 0.0f,		1.0f, 1.0f,   // top right
+		0.5f - offset, -0.5f, 0.0f,		1.0f, 0.0f,   // bottom right
+		-0.5f - offset, -0.5f, 0.0f,	0.0f, 0.0f,   // bottom left
+		-0.5f - offset,  0.5f, 0.0f,	0.0f, 1.0f,    // top left 
+
+		// right texture
+		0.5f + offset,  0.5f, 0.0f,		1.0f, 1.0f,   // top right
+		0.5f + offset, -0.5f, 0.0f,		1.0f, 0.0f,   // bottom right
+		-0.5f + offset, -0.5f, 0.0f,	0.0f, 0.0f,   // bottom left
+		-0.5f + offset,  0.5f, 0.0f,	0.0f, 1.0f    // top left 
 	};
 
 	u32 indices[] = {
 		0, 1, 3,
-		1, 2, 3
+		1, 2, 3,
+
+		4, 5, 7,
+		5, 6, 7
 	};
 
 	//vertex array object
@@ -163,25 +174,21 @@ int singleTexture(GLFWwindow* window) {
 	const char* vertexShaderSource = R"(
 		#version 330 core
 		layout (location = 0) in vec3 pos;
-		layout (location = 1) in vec4 color;
-		layout (location = 2) in vec2 texCoords;
+		layout (location = 1) in vec2 texCoords;
 
-		out vec4 vColor;
 		out vec2 vCoord;
 
 		void main() 
 		{
 			gl_Position = vec4(pos.xyz, 1.0);
-			vColor = color;
 			vCoord = texCoords;
 		}	
 	)";
 
 	// fragment shader
-	const char* fragmentShaderSource = R"(
+	const char* normalFragmentShaderSource = R"(
 		#version 330 core
 
-		in vec4 vColor;
 		in vec2 vCoord;
 		uniform sampler2D uTexture;
 		out vec4 fColor;
@@ -192,19 +199,17 @@ int singleTexture(GLFWwindow* window) {
 		}
 	)";
 
-	Pipeline pipeline = Pipeline(vertexShaderSource, fragmentShaderSource);
+	Pipeline normalPipeline = Pipeline(vertexShaderSource, normalFragmentShaderSource);
 
-	if (!pipeline.id) {
+	if (!normalPipeline.id) {
 		return -5;
 	}
 
 	// setup vertex attributes
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-	glEnableVertexAttribArray(2);
 
 	// setup texture state
 	u32 texture;
@@ -232,16 +237,16 @@ int singleTexture(GLFWwindow* window) {
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		pipeline.use();
+		normalPipeline.use();
 		glBindVertexArray(vao);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture);
 
-		float time = (float)glfwGetTime();
-		float color = (float)sin(time) / 2.0f + 0.5f;
-
 		//draw
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+		normalPipeline.use();
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)(6 * sizeof(int)));
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -290,7 +295,6 @@ int main(int argc, char* argv[])
 		result = -3;
 		goto gladLoadGLFail;
 	}
-
 
 	// turn on the different render outputs by changing the falses to 
 	// true. very primitive but quick to prototype.
