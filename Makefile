@@ -1,5 +1,5 @@
 OBJS = src/*
-OUT = hello_world
+OUT = hello_world.out
 CC = g++
 COMPILER_FLAGS = -w -Wall -pedantic `sdl2-config --cflags --libs`
 LINKER_FLAGS = -lSDL2
