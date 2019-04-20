@@ -58,6 +58,7 @@ int main(int argc, char** argv) {
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
 		SDL_GLContext gContext = SDL_GL_CreateContext(G_screenWindow);
+		const char* bleh = SDL_GetError();
 		SDL_assert_release(gContext);
 
 		gladLoadGLLoader(SDL_GL_GetProcAddress);

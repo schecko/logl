@@ -9,7 +9,10 @@ LINKER_FLAGS = -lSDL2 -lSDL2_image -ldl `sdl2-config --libs`
 
 # glad depends on libdl
 
-%.o: %.c %.cpp
+%.o: %.c
+	$(CC) $(INC) $(COMPILER_FLAGS) $< $(OUTPUT_OPTION)
+
+%.o: %.cpp
 	$(CC) $(INC) $(COMPILER_FLAGS) $< $(OUTPUT_OPTION)
 
 all: $(OBJS)
