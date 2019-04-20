@@ -34,3 +34,6 @@
 *.sln
 CMakeFiles/*
 proj/*
+
+
+main
